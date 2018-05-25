@@ -1,0 +1,2 @@
+Declarative artifacts proposal
+==============================
