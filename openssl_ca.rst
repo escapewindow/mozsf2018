@@ -56,20 +56,20 @@ Current pain points
    cot-gpg-keys pull request manually.
 -  Releng team needs to manually generate and sign scriptworker gpg
    keys.
--  the public and private keys go into Hiera, a manual and error-prone
+   -  the public and private keys go into Hiera, a manual and error-prone
    process
--  these keypairs are unique per instance, rather than shared across
-   pools, despite no verification that the key matches the ``workerId``.
-   This means we need to create new gpg keypairs every time we enlarge a
-   scriptworker pool.
+   -  these keypairs are unique per instance, rather than shared across
+      pools, despite no verification that the key matches the ``workerId``.
+      This means we need to create new gpg keypairs every time we enlarge a
+      scriptworker pool.
 -  ``scriptworker.gpg`` currently bails on any expiration or revocation
    markers on any keys or subkeys, to try to catch any issues before
    they can cause problems. This means a number of users' work GPG keys
    aren't usable for CoT, because they have subkeys or signatures that
    have expired or been revoked. We could drop this "feature", but it's
    unclear if this would have a negative impact on security.
--  ``scriptworker.gpg`` requires GPG 2.0.x behavior. GPG 2.0.x is past
-   its end of life.
+   -  ``scriptworker.gpg`` requires GPG 2.0.x behavior. GPG 2.0.x is past
+      its end of life.
 -  expiration and revocation is managed by the existence of a key in the
    cot-gpg-keys repo, which requires a manual update. There is no
    concept of a key that is valid for a given window of time and still
