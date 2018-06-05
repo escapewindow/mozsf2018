@@ -51,32 +51,18 @@ key management is described
 Current pain points
 ~~~~~~~~~~~~~~~~~~~
 
--  Taskcluster / relops teams need to use more-manual-than-desired
-   process to generate gpg keys and copy the public key into a
-   cot-gpg-keys pull request manually.
--  Releng team needs to manually generate and sign scriptworker gpg
-   keys.
-   -  the public and private keys go into Hiera, a manual and error-prone
-   process
-   -  these keypairs are unique per instance, rather than shared across
-      pools, despite no verification that the key matches the ``workerId``.
-      This means we need to create new gpg keypairs every time we enlarge a
-      scriptworker pool.
--  ``scriptworker.gpg`` currently bails on any expiration or revocation
-   markers on any keys or subkeys, to try to catch any issues before
-   they can cause problems. This means a number of users' work GPG keys
-   aren't usable for CoT, because they have subkeys or signatures that
-   have expired or been revoked. We could drop this "feature", but it's
-   unclear if this would have a negative impact on security.
-   -  ``scriptworker.gpg`` requires GPG 2.0.x behavior. GPG 2.0.x is past
-      its end of life.
--  expiration and revocation is managed by the existence of a key in the
-   cot-gpg-keys repo, which requires a manual update. There is no
-   concept of a key that is valid for a given window of time and still
-   verifiable historically.
--  because key management is quite fiddly, we only have cot signature
-   verification enabled on the scriptworkers. This means we can't take
-   advantage of the CoT to download and verify artifacts in other tasks.
+* Taskcluster / relops teams need to use more-manual-than-desired process to generate gpg keys and copy the public key into a cot-gpg-keys pull request manually.
+* Releng team needs to manually generate and sign scriptworker gpg keys.
+
+  * the public and private keys go into Hiera, a manual and error-prone process
+  * these keypairs are unique per instance, rather than shared across pools, despite no verification that the key matches the ``workerId``. This means we need to create new gpg keypairs every time we enlarge a scriptworker pool.
+
+* ``scriptworker.gpg`` currently bails on any expiration or revocation markers on any keys or subkeys, to try to catch any issues before they can cause problems. This means a number of users' work GPG keys aren't usable for CoT, because they have subkeys or signatures that have expired or been revoked. We could drop this "feature", but it's unclear if this would have a negative impact on security.
+
+  * ``scriptworker.gpg`` requires GPG 2.0.x behavior. GPG 2.0.x is past its end of life.
+
+* expiration and revocation is managed by the existence of a key in the cot-gpg-keys repo, which requires a manual update. There is no concept of a key that is valid for a given window of time and still verifiable historically.
+* because key management is quite fiddly, we only have cot signature verification enabled on the scriptworkers. This means we can't take advantage of the CoT to download and verify artifacts in other tasks.
 
 Initial OpenSSL CA proposal
 ---------------------------
@@ -85,7 +71,8 @@ First, the security team generates a root cert and creates an
 intermediate cert to use in operations. The root cert is locked away.
 
 We use the intermediate cert to sign worker certs. (TBD whether this is
-per-workerId, workerType, AMI, level, worker implementation, etc.)
+per-workerId, workerType, AMI, level, worker implementation, etc.; the process
+for requesting signed CSRs is also TBD.)
 
 We'll need worker code to use the new certs to sign the chain of trust
 artifact. We currently have worker implementations in Go, Node, and
@@ -93,15 +80,17 @@ Python, though the Node implementation may be scheduled for retirement.
 
 We need library code or a tool to verify the signatures of chain of
 trust artifacts. For parity, scriptworker will need this ability for
-chain of trust verification. However, given libraries or tools that
-could verify a chain of trust artifact's signature, download task
-artifacts, and verify their shas, we could extend artifact verification
-across the entire graph, not just scriptworker tasks.
+chain of trust verification. However, we could implement libraries or tools that
+could verify a chain of trust artifact's signature, downloads task
+artifacts, and verifies their shas. (Bonus points for verifying the entire
+chain of trust back to the tree.) Given these libraries or tools, e could
+extend artifact verification across the entire graph, not just scriptworker
+tasks.
 
-I assume we'll trust the root CA, and any worker cert signed by one of
+I assume we'll trust the root CA. Any worker cert signed by one of
 its intermediate CAs will be valid for the lifespan of the worker cert.
-In case of a cert leaking, we likely need some certificate revocation
-list that the verification libraries or tools will check.
+We will likely need a certificate revocation list that the verification
+libraries or tools will check, to invalidate any certs that leak.
 
 Open Questions
 ~~~~~~~~~~~~~~
@@ -111,7 +100,7 @@ Do we trust the provisioners?
 
 If we trust the provisioners, we could give the AWS provisioner an
 intermediate cert for workerTypes under its control. It could sign
-worker CRFs, either by workerType or workerId. If we wanted to generate
+worker CSRs, either by workerType or workerId. If we wanted to generate
 more, shorter-lived certs, we could potentially embed AWS instance ID
 information into the cert as well. Alternately, we could add a set of
 pre-generated worker certs to the provisioner, and allow it to
@@ -129,16 +118,16 @@ Do we want worker certs to be shared widely?
 At one extreme, we could create a single worker cert, and share that
 cert across all level 3 workerTypes. This is easy to maintain,
 distribute, and verify; we don't necessarily even need a CA here: a
-self-signed cert would likely suffice. However, given an attack on CoT,
-any workerType would be able to forge the chain of trust artifact for
-any other workerType. E.g., if a Windows generic worker were
+self-signed cert would likely suffice. However, given an attack on CoT and
+a single compromised worker, any workerType would be able to forge the chain of
+trust artifact for any other workerType. E.g., if a Windows generic worker were
 compromised, the attacker could use its cert to generate fake taskgraph
 artifacts that could mark malicious tasks as valid.
 
 At the other extreme, we could generate certs that are only valid for a
 given workerId and EC2 instance ID. This means we would need to automate
 cert generation and signing, but the compromise of a single cert would
-have limited damage.
+be restricted in the damage it could perform.
 
 How will we sign worker certs?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
