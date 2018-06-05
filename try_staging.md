@@ -18,10 +18,15 @@ Ideally, all release task types will give us *some* useful information when we r
 
 #### pushapk
 
-Pushapk tasks can't submit to the Google Play store, but they might be able to inspect the Try apk and check that it's signed with the expected [dep] key, and has the expected package name / shared ID.
+Since [bug 1412836](https://bugzilla.mozilla.org/show_bug.cgi?id=1412836), there's a special pushapk instance compatible with the [dep] key. When detected, it performs all the things done by the production instance, but connecting to Google Play. Thus, this instance doesn't have any access/account that might mess up the production data.
+
+:warning: This hasn't been tested on try. There might be an integration bug due to configuration.
 
 #### pushsnap
-pushsnap tasks are similar - we might inspect the binary.
+
+Like pushapk, since [this commit](https://github.com/mozilla-releng/pushsnapscript/commit/3a8eb4c3de92403b0b5e202a550efe69c79f8d01), there's a special pushsnap instance that doesn't contact the snap store. However, no checks on the binary is done yet. Therefore, this task is mainly a no-op.
+
+:warning: This hasn't been tested on try. There might be an integration bug due to configuration.
 
 #### treescript
 - treescript - we could potentially bump the version and tag Try. We'll likely need to update the cloning logic to pull only the specific Try head. We probably want to add a level 1 secret ssh key that only has level 1 commit privileges.
