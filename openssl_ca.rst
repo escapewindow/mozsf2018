@@ -1,7 +1,7 @@
 Chain of Trust OpenSSL CA
 =========================
 
-(discussion moved to [gdocs](https://docs.google.com/document/d/1YAySxchQYp6SBet9DJpfHOU0knO4yFqEXIWuWoO_h4Y/edit))
+(discussion moved to `gdocs <https://docs.google.com/document/d/1YAySxchQYp6SBet9DJpfHOU0knO4yFqEXIWuWoO_h4Y/edit>`__)
 
 .. contents::
 
