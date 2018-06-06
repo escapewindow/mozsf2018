@@ -44,7 +44,11 @@ This list may not be complete; we should verify that all task types give useful 
 
 ## Phase 2: Concurrent staging releases on Try
 
+In my mind, we need to be able to run concurrent staging releases on Try before we're done with this project.
+
 ### The problem
+
+Currently, staging releases rely on the state of the bouncer, balrog, shipit staging servers. We don't have the capability of deleting files from the staging S3 bucket. Enough of our workflow is based upon the version and channel in-tree that we're seeing staging version inflation. For example, if we need to test RC behavior, we have to have a version that ends in .0; because we've already tested 62.0 and 63.0, we'd have to test with version 64.0.
 
 ### Namespaces
 
