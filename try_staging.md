@@ -29,6 +29,7 @@ Like pushapk, since [this commit](https://github.com/mozilla-releng/pushsnapscri
 :warning: This hasn't been tested on try. There might be an integration bug due to configuration.
 
 #### treescript
+
 - treescript - we could potentially bump the version and tag Try. We'll likely need to update the cloning logic to pull only the specific Try head. We probably want to add a level 1 secret ssh key that only has level 1 commit privileges.
 
 #### bouncer
@@ -64,10 +65,32 @@ We brainstormed an idea to automatically launch new balrog/bouncer/s3 staging do
 
 #### Balrog instance
 
+We talk about re-setting the staging balrog instance to something closer to the production instance, to make tests closer to production. We could automate a process to spin up a new balrog docker instance, populate it with recent production data, and allow for staging balrog scriptworkers to access it... an in-tree patch could point the graph at that instance.
+
+Since we're checking this instance out, rather than auto-spinning it up, we then have the ability to make any changes to that instance, should we want to test a separate configuration.
+
+We can use this instance as long as it's useful, and then retire it.
+
+Since these instances are separate, we don't have to worry about changing channel names to avoid cross-staging-release interference. We could just use `beta` or `release` or whatever we're testing.
+
 #### S3 docker instance
+
+We have to consider the stage of the S3 staging bucket when we start a new staging release. (I believe we default to downloading previous releases from the release bucket to craft and test updates; we also have to pay make sure we don't reuse version numbers or build numbers to avoid push-to-cdns bustage.)
+
+We were brainstorming spinning up a docker instance that can mock the S3 api. We can beetmove our artifacts to that instance; we can either point at the production bucket or this instance, with redirects, for downloading previous releases for update generation and testing.
+
+Similar to the Balrog instance, we could make any desired changes to the environment before starting our release, point the tree and staging balrog scriptworkers at it via in-tree taskgraph changes, use it for as long as we need it, and then retire it. Since we can each have our own S3 docker instances, we don't have to worry about cross-staging-release interference.
 
 #### Bouncer instance
 
+Similarly, to avoid depending on a shared bouncer state, we can spin up an independent bouncer instance to use for our staging releases.
+
+#### Ship-it instance?
+
+We probably need either to make ship-it able to support multiple staging environments, or we may want to spin up multiple ship-it instances.
+
 #### Others?
+
+This may not be a comprehensive list of services we need to support.
 
 ### Some other solution?
