@@ -2,7 +2,9 @@
 
 ## Overview
 
-We want our staging releases to be testable on Try. There are two phases here:
+We want to be able to run our staging releases on Try. This would allow the Releng team to test arbitrary release configs without having to set up maple or some other project branch first; and it would open release automation testing to other teams that want to make sure their changes haven't broken release automation.
+
+There are two phases here:
 
 ## Phase 1: All task types run on Try
 
@@ -14,7 +16,9 @@ The first part of this phase would be to determine which task types we're missin
 
 Just because some of the tasks run on Try doesn't mean they return useful information. For instance, if a pushapk task runs on Try as a dummy task that runs `/bin/true` and is perma-green, we don't necessarily have any assurances that changes to the pushapk task, script, or pool will work when we land our changes in production.
 
-Ideally, all release task types will give us *some* useful information when we run them, even on Try.
+Ideally, all release task types will give us *some* useful information when we run them, even on Try. We should strive for as much useful information as is practical.
+
+At the end of this phase, releng and other teams should be able to fully test staging releases on Try, with the caveat that only a single staging release per product can run at a time.
 
 #### pushapk
 
@@ -30,14 +34,29 @@ Like pushapk, since [this commit](https://github.com/mozilla-releng/pushsnapscri
 
 #### treescript
 
-- treescript - we could potentially bump the version and tag Try. We'll likely need to update the cloning logic to pull only the specific Try head. We probably want to add a level 1 secret ssh key that only has level 1 commit privileges.
+I believe we only support Treescript running on level 3 repos at the moment.
+
+We could potentially bump the version and tag Try. We'll likely need to update the cloning logic to pull only the specific Try head.
 
 #### bouncer
-- bouncer-{check,aliases} - these, and possibly final verify, tend to break on staging releases, I think because of a shared staging bouncer instance and different release history between prod and staging. This may also affect final verify.
+
+Bouncer-{check,aliases}, and possibly final verify, tend to break on staging releases. I think this is because we use a shared staging bouncer instance, and staging release history is divergent between prod and staging. This may also affect final verify.
+
+I'm hoping we can find some way to make this more workable in staging before phase 2.
 
 #### Update Verify
 
-These are perma-red in staging. We need to allowlist the try- channel names if we change them, and we need to deal with the fact that we're updating to a dep-signed binary rather than a release-signed one. The updater itself has a hardcoded set of allowed signing keys which doesn't include the dep key; we need to find a solution here if we want useful info from these tasks. And these tests depend on the shared staging balrog instance being in a specific state; parallel staging releases can easily break the testing assumptions, which segues nicely into phase 2.
+These are perma-red in staging. We need to allowlist the staging update channel names if they differ from production, and we need to deal with the fact that we're updating to a dep-signed binary rather than a release-signed one. The updater itself has a hardcoded set of allowed signing keys which doesn't include the dep key; we need to find a solution here if we want useful info from these tasks (our previous brainstormed pointed at using the xpcshell? updater, which allows using dep-signed MARs). These tests depend on the shared staging balrog instance being in a specific state; parallel staging releases can easily break the testing assumptions, which segues nicely into phase 2.
+
+#### Version numbers
+
+As alluded to above, we base our behavior on the version number and build number. We also have a fragile partial update situation: aiui, the partial updates specified need to exist in both staging and production, making it trickier to find which version+buildnumber(s) to specify.
+
+For the former, we could un-hardcode version-based behavior, and have an overrideable pull-down menu for beta, release, or RC behavior. For the latter, we could adjust the checks and workflow to allow for production-only releases for partials. We might decide to live with both of these limitations here, but ideally with some documentation.
+
+#### Documentation
+
+At the end of this phase, documentation needs to be enough to reserve a product for staging releases, trigger a staging release on Try, understand what each of the `promote`/`push`/`ship` phases do, and how to troubleshoot. I imagine this will be a living document that grows over time.
 
 #### potentially others
 
@@ -49,25 +68,27 @@ In my mind, we need to be able to run concurrent staging releases on Try before 
 
 ### The problem
 
-Currently, staging releases rely on the state of the bouncer, balrog, shipit staging servers; concurrent staging releases can break that expected state for the other staging releases. We don't have the capability of deleting files from the staging S3 bucket, so the state of the bucket is also in question. Enough of our workflow is based upon the version and channel in-tree that we're seeing staging version inflation. For example, if we need to test RC behavior, we have to have a version that ends in .0; because we've already tested 62.0 and 63.0, we'd have to test with version 64.0.
+Currently, staging releases rely on the state of the bouncer, balrog, and shipit staging servers, as well as the staging S3 bucket; concurrent staging releases cause bustage.
 
-Restricting ourselves to a single staging release has been an acceptable limit as long as staging releases were restricted to the releng team, though we sometimes stepped on our own toes running concurrent tests on maple and jamun. If we can each push to try but can only run our staging releases synchronously, we lose a lot of the utility and flexibility that comes with Try.
+Restricting ourselves to a single staging release at a time (per product) has been an acceptable limit as long as staging releases were restricted to the releng team. However, if we're limited to running our Try staging releases synchronously, we lose a lot of the utility and flexibility that comes with Try.
 
-Two ways we could address this is with namespaces or a library of staging services, described below.
+We could potentially address this with namespaces or a library of staging services, described below.
 
 ### Namespaces
 
-If we allowed for staging release namespaces, and changed the staging services to use those namespaces, we could avoid collisions. For example, if I created an `aki-rc-20180606` namespace, we could use the `aki-rc-20180606-beta` update channel, publish to the staging bucket under `candidates/aki-rc-20180606/` directory, and/or possibly use the `61.0b1.aki-rc-20180606` version number after un-coupling the release behavior from the version number. Ideally we could allow for concurrent staging releases that don't affect the others' behavior, though it could get a little messy.
+Namespaces in shared services could help avoid collisions. Rather than trying to update and test the beta and beta-localtest channels on the staging balrog server, it could be *user*-beta and *user*-beta-localtest. Beetmover could use *user*-candidates/ and *user*-releases/. Bouncer could either use the namespace in the product name or the version number. Ideally we could allow for concurrent staging releases that don't affect the others' behavior. The downside here is it could get quite messy.
 
 ### Library of staging services
 
-We brainstormed an idea to automatically launch new balrog/bouncer/s3 staging docker instances when we start a new staging release, and tearing it down afterwards. This is a bit complex, and doesn't allow for more complex tests, like a series of staging releases where we test updating from one to the next. It may make more sense for us to be able to request new instances beforehand, like checking out books from a library, and return them when we're done.
+We may be able to request new docker instances of bouncer, balrog, and "s3" before running a staging release, like checking out books from a library, and retire them when we're done.
+
+We had brainstormed spinning these instances up automatically, but that may prove tricky, time consuming, and not allow for alternate or complex testing scenarios. For instance, we may want to run two or more staging releases in a row, and verify that the first can update to subsequent releases. The library allows us to set up instances beforehand, modify them if desired, keep them up for one or more releases, and choose when to retire them.
+
+When we finish implementing this, we should be able to support `n` concurrent staging releases on Try.
 
 #### Balrog instance
 
-We talk about re-setting the staging balrog instance to something closer to the production instance, to make tests closer to production. We could automate a process to spin up a new balrog docker instance, populate it with recent production data, and allow for staging balrog scriptworkers to access it... an in-tree patch could point the graph at that instance.
-
-Since we're checking this instance out, rather than auto-spinning it up, we then have the ability to make any changes to that instance, should we want to test a separate configuration.
+With the shared staging balrog server, we occasionally want to reset the instance, to make tests closer to production. We could automate a process to spin up a new balrog docker instance, populate it with recent production data, and allow for staging balrog scriptworkers to access it... an in-tree patch could point the graph at that instance.
 
 We can use this instance as long as it's useful, and then retire it.
 
@@ -75,11 +96,11 @@ Since these instances are separate, we don't have to worry about changing channe
 
 #### S3 docker instance
 
-We have to consider the stage of the S3 staging bucket when we start a new staging release. (I believe we default to downloading previous releases from the release bucket to craft and test updates; we also have to pay make sure we don't reuse version numbers or build numbers to avoid push-to-cdns bustage.)
+We currently have to consider the stage of the S3 staging bucket when we start a new staging release. (We can't reuse pushed version numbers to avoid push-to-cdns bustage.)
 
-We were brainstorming spinning up a docker instance that can mock the S3 api. We can beetmove our artifacts to that instance; we can either point at the production bucket or this instance, with redirects, for downloading previous releases for update generation and testing.
+We were brainstorming spinning up a docker instance that can mock the S3 api. We can beetmove our artifacts to that instance. When we download previous releases for update generation and testing, we can point at this instance, and redirect to production if the files don't exist here.
 
-Similar to the Balrog instance, we could make any desired changes to the environment before starting our release, point the tree and staging balrog scriptworkers at it via in-tree taskgraph changes, use it for as long as we need it, and then retire it. Since we can each have our own S3 docker instances, we don't have to worry about cross-staging-release interference.
+Similar to the Balrog instance, we could make any desired changes to the environment before starting our release, point the tree and staging beetmover scriptworkers at it via in-tree taskgraph changes, use it for as long as we need it, and then retire it. Since we can each have our own S3 docker instances, we don't have to worry about cross-staging-release interference.
 
 #### Bouncer instance
 
@@ -87,10 +108,10 @@ Similarly, to avoid depending on a shared bouncer state, we can spin up an indep
 
 #### Ship-it instance?
 
-We probably need either to make ship-it able to support multiple staging environments, or we may want to spin up multiple ship-it instances.
+Overall ship-it allows for concurrent releases, with the caveat that it has its constraints around version- and build-numbers. We may want to either bypass this for staging (allow `n` version-buildnumber combinations?) or allow for spinning up new ship-it instances.
 
 #### Others?
 
-This may not be a comprehensive list of services we need to support.
+This may not be a comprehensive list of services we need to support... we may have to add more to this list.
 
 ### Some other solution?
