@@ -8,7 +8,7 @@ There are two phases here:
 
 ## Phase 1: All task types run on Try
 
-Tom Prince has most of this working due to his work migrating Thunderbird to Taskcluster. However, a) I'm not sure if the entirety of the `promote`/`push`/`ship`/`promote_rc`/`ship_rc` phases are covered, and b) there are a number of Firefox and Fennec specific tasks types that also may not be covered.
+Tom Prince has most of this working due to his work migrating Thunderbird to Taskcluster. However, a) I'm not sure if the entirety of the `promote`/`push`/`ship`/`promote_rc`/`ship_rc`/`promote_partners` phases are covered, and b) there are a number of Firefox- and Fennec- specific tasks types that also may not be covered.
 
 The first part of this phase would be to determine which task types we're missing for Firefox and Fennec Try staging releases and get them runnable on Try.
 
@@ -66,6 +66,8 @@ This list may not be complete; we should verify that all task types give useful 
 
 In my mind, we need to be able to run concurrent staging releases on Try before we're done with this project.
 
+When we finish implementing this, we should be able to support `n` concurrent staging releases on Try.
+
 ### The problem
 
 Currently, staging releases rely on the state of the bouncer, balrog, and shipit staging servers, as well as the staging S3 bucket; concurrent staging releases cause bustage.
@@ -83,8 +85,6 @@ Namespaces in shared services could help avoid collisions. Rather than trying to
 We may be able to request new docker instances of bouncer, balrog, and "s3" before running a staging release, like checking out books from a library, and retire them when we're done.
 
 We had brainstormed spinning these instances up automatically, but that may prove tricky, time consuming, and not allow for alternate or complex testing scenarios. For instance, we may want to run two or more staging releases in a row, and verify that the first can update to subsequent releases. The library allows us to set up instances beforehand, modify them if desired, keep them up for one or more releases, and choose when to retire them.
-
-When we finish implementing this, we should be able to support `n` concurrent staging releases on Try.
 
 #### Balrog instance
 
