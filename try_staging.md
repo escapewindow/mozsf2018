@@ -1,5 +1,7 @@
 # Staging releases on Try
 
+Moved [here](https://docs.google.com/document/d/1_p6jqQ9YUojerRwgfdMhEyjOFpkvkHONDd6nNnRMNlY/edit) for dicussion.
+
 ## Overview
 
 We want to be able to run our staging releases on Try. This would allow the Releng team to test arbitrary release configs without having to set up maple or some other project branch first; and it would open release automation testing to other teams that want to make sure their changes haven't broken release automation.
